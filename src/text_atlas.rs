@@ -28,7 +28,7 @@ pub(crate) struct InnerAtlas {
 }
 
 impl InnerAtlas {
-    const INITIAL_SIZE: u32 = 256;
+    const INITIAL_SIZE: u32 = 1024;
 
     fn new(device: &Device, _queue: &Queue, kind: Kind) -> Self {
         let max_texture_dimension_2d = device.limits().max_texture_dimension_2d;
