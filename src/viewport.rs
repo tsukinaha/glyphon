@@ -23,8 +23,6 @@ impl Viewport {
                 width: 0,
                 height: 0,
             },
-            shadow_intensity: 0.5,
-            shadow_radius: 3.0,
         };
 
         let params_buffer = device.create_buffer(&BufferDescriptor {

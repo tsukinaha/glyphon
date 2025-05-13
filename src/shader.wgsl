@@ -6,6 +6,8 @@ struct VertexInput {
     @location(3) color: u32,
     @location(4) content_type_with_srgb: u32,
     @location(5) depth: f32,
+    @location(6) shadow_radius: f32,
+    @location(7) shadow_intensity: f32,
 }
 
 struct VertexOutput {
@@ -13,12 +15,12 @@ struct VertexOutput {
     @location(0) color: vec4<f32>,
     @location(1) uv: vec2<f32>,
     @location(2) @interpolate(flat) content_type: u32,
+    @location(3) shadow_radius: f32,
+    @location(4) shadow_intensity: f32, 
 };
 
 struct Params {
     screen_resolution: vec2<u32>,
-    shadow_radius: f32,
-    shadow_intensity: f32,
 };
 
 @group(0) @binding(0)
@@ -110,6 +112,9 @@ fn vs_main(in_vert: VertexInput) -> VertexOutput {
 
     vert_output.uv = vec2<f32>(uv) / vec2<f32>(dim);
 
+    vert_output.shadow_radius = in_vert.shadow_radius;
+    vert_output.shadow_intensity = in_vert.shadow_intensity;
+
     return vert_output;
 }
 
@@ -125,7 +130,7 @@ fn fs_main(in_frag: VertexOutput) -> @location(0) vec4<f32> {
             var max_shadow_value = 0.0;
 
             let MAX_KERNEL_RADIUS = 5.0;
-            let radius_pixels = params.shadow_radius;
+            let radius_pixels = in_frag.shadow_radius;
             let shadow_rgb = vec3<f32>(0.0, 0.0, 0.0);
 
             if (radius_pixels > 0.0) {
@@ -146,8 +151,8 @@ fn fs_main(in_frag: VertexOutput) -> @location(0) vec4<f32> {
                             let text_mask_at_P = textureSampleLevel(mask_atlas_texture, atlas_sampler, sample_uv, 0.0).x;
 
                             if (text_mask_at_P > 0.01) {
-                                let falloff = 1.0 - min(dist_pixels, radius_pixels) / radius_pixels;
-                                let current_shadow_val = text_mask_at_P * params.shadow_intensity * falloff;
+                                let falloff = smoothstep(radius_pixels, 0.0, dist_pixels);
+                                let current_shadow_val = text_mask_at_P * in_frag.shadow_intensity * falloff;
                                 max_shadow_value = max(max_shadow_value, current_shadow_val);
                             }
                         }

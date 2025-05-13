@@ -20,6 +20,8 @@ pub use text_atlas::{ColorMode, TextAtlas};
 pub use text_render::TextRenderer;
 pub use viewport::Viewport;
 
+pub const SHADOW_MARGIN_PX: u16 = 8;
+
 // Re-export all top-level types from `cosmic-text` for convenience.
 #[doc(no_inline)]
 pub use cosmic_text::{
@@ -59,6 +61,8 @@ pub(crate) struct GlyphToRender {
     color: u32,
     content_type_with_srgb: [u16; 2],
     depth: f32,
+    shadow_radius: f32,
+    shadow_intensity: f32,
 }
 
 /// The screen resolution to use when rendering text.
@@ -75,8 +79,6 @@ pub struct Resolution {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct Params {
     screen_resolution: Resolution,
-    shadow_radius: f32,
-    shadow_intensity: f32,
 }
 
 /// Controls the visible area of the text. Any text outside of the visible area will be clipped.
@@ -122,4 +124,12 @@ pub struct TextArea<'a> {
     pub default_color: Color,
     /// Additional custom glyphs to render.
     pub custom_glyphs: &'a [CustomGlyph],
+
+    pub shadow: Option<TextShadow>,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct TextShadow {
+    pub shadow_intensity: f32,
+    pub shadow_radius: f32,
 }

@@ -1,6 +1,6 @@
 use crate::{
     text_render::GlyphonCacheKey, Cache, ContentType, FontSystem, GlyphDetails, GpuCacheStatus,
-    RasterizeCustomGlyphRequest, RasterizedCustomGlyph, SwashCache,
+    RasterizeCustomGlyphRequest, RasterizedCustomGlyph, SwashCache, SHADOW_MARGIN_PX,
 };
 use etagere::{size2, Allocation, BucketedAtlasAllocator};
 use lru::LruCache;
@@ -14,6 +14,8 @@ use wgpu::{
 };
 
 type Hasher = BuildHasherDefault<FxHasher>;
+
+const M: i32 = SHADOW_MARGIN_PX as i32;
 
 #[allow(dead_code)]
 pub(crate) struct InnerAtlas {
@@ -70,38 +72,12 @@ impl InnerAtlas {
     }
 
     pub(crate) fn try_allocate(&mut self, width: usize, height: usize) -> Option<Allocation> {
-        let size = size2(width as i32, height as i32);
+        let padded = size2(width as i32 + 2 * M, height as i32 + 2 * M);
+        let mut allocation = self.packer.allocate(padded)?;
 
-        loop {
-            let allocation = self.packer.allocate(size);
-
-            if allocation.is_some() {
-                return allocation;
-            }
-
-            // Try to free least recently used allocation
-            let (mut key, mut value) = self.glyph_cache.peek_lru()?;
-
-            // Find a glyph with an actual size
-            while value.atlas_id.is_none() {
-                // All sized glyphs are in use, cache is full
-                if self.glyphs_in_use.contains(key) {
-                    return None;
-                }
-
-                let _ = self.glyph_cache.pop_lru();
-
-                (key, value) = self.glyph_cache.peek_lru()?;
-            }
-
-            // All sized glyphs are in use, cache is full
-            if self.glyphs_in_use.contains(key) {
-                return None;
-            }
-
-            let (_, value) = self.glyph_cache.pop_lru().unwrap();
-            self.packer.deallocate(value.atlas_id.unwrap());
-        }
+        allocation.rectangle.min.x += M;
+        allocation.rectangle.min.y += M;
+        Some(allocation)
     }
 
     pub fn num_channels(&self) -> usize {
