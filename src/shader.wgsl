@@ -17,7 +17,8 @@ struct VertexOutput {
 
 struct Params {
     screen_resolution: vec2<u32>,
-    _pad: vec2<u32>,
+    shadow_radius: f32,
+    shadow_intensity: f32,
 };
 
 @group(0) @binding(0)
@@ -119,7 +120,48 @@ fn fs_main(in_frag: VertexOutput) -> @location(0) vec4<f32> {
             return textureSampleLevel(color_atlas_texture, atlas_sampler, in_frag.uv, 0.0);
         }
         case 1u: {
-            return vec4<f32>(in_frag.color.rgb, in_frag.color.a * textureSampleLevel(mask_atlas_texture, atlas_sampler, in_frag.uv, 0.0).x);
+            let glyph_alpha = textureSampleLevel(mask_atlas_texture, atlas_sampler, in_frag.uv, 0.0).x;
+
+            var max_shadow_value = 0.0;
+
+            let MAX_KERNEL_RADIUS = 5.0;
+            let radius_pixels = params.shadow_radius;
+            let shadow_rgb = vec3<f32>(0.0, 0.0, 0.0);
+
+            if (radius_pixels > 0.0) {
+                let tex_dims = vec2<f32>(textureDimensions(mask_atlas_texture, 0u));
+                let pixel_size = vec2<f32>(1.0 / tex_dims.x, 1.0 / tex_dims.y);
+
+                let R_int = i32(min(ceil(radius_pixels), MAX_KERNEL_RADIUS));
+
+                for (var dy: i32 = -R_int; dy <= R_int; dy = dy + 1) {
+                    for (var dx: i32 = -R_int; dx <= R_int; dx = dx + 1) {
+                        let offset_pixels = vec2<f32>(f32(dx), f32(dy));
+                        let dist_sq = dot(offset_pixels, offset_pixels);
+
+                        if (dist_sq <= radius_pixels * radius_pixels) {
+                            let dist_pixels = sqrt(dist_sq);
+                            let sample_uv = in_frag.uv - offset_pixels * pixel_size;
+
+                            let text_mask_at_P = textureSampleLevel(mask_atlas_texture, atlas_sampler, sample_uv, 0.0).x;
+
+                            if (text_mask_at_P > 0.01) {
+                                let falloff = 1.0 - min(dist_pixels, radius_pixels) / radius_pixels;
+                                let current_shadow_val = text_mask_at_P * params.shadow_intensity * falloff;
+                                max_shadow_value = max(max_shadow_value, current_shadow_val);
+                            }
+                        }
+                    }
+                }
+            }
+
+            let combined_shape_alpha = clamp(max(glyph_alpha, max_shadow_value), 0.0, 1.0);
+            
+            let final_rgb = mix(shadow_rgb, in_frag.color.rgb, glyph_alpha);
+            
+            let final_a = in_frag.color.a * combined_shape_alpha;
+            
+            return vec4<f32>(final_rgb, final_a);
         }
         default: {
             return vec4<f32>(0.0);

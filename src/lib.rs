@@ -72,10 +72,11 @@ pub struct Resolution {
 }
 
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct Params {
     screen_resolution: Resolution,
-    _pad: [u32; 2],
+    shadow_radius: f32,
+    shadow_intensity: f32,
 }
 
 /// Controls the visible area of the text. Any text outside of the visible area will be clipped.
