@@ -23,7 +23,6 @@ impl Viewport {
                 width: 0,
                 height: 0,
             },
-            _pad: [0, 0],
         };
 
         let params_buffer = device.create_buffer(&BufferDescriptor {

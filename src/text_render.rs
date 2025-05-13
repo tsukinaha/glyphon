@@ -1,7 +1,5 @@
 use crate::{
-    custom_glyph::CustomGlyphCacheKey, ColorMode, ContentType, FontSystem, GlyphDetails,
-    GlyphToRender, GpuCacheStatus, PrepareError, RasterizeCustomGlyphRequest,
-    RasterizedCustomGlyph, RenderError, SwashCache, SwashContent, TextArea, TextAtlas, Viewport,
+    custom_glyph::CustomGlyphCacheKey, ColorMode, ContentType, FontSystem, GlyphDetails, GlyphToRender, GpuCacheStatus, PrepareError, RasterizeCustomGlyphRequest, RasterizedCustomGlyph, RenderError, SwashCache, SwashContent, TextArea, TextAtlas, TextShadow, Viewport
 };
 use cosmic_text::{Color, SubpixelBin};
 use std::slice;
@@ -10,6 +8,35 @@ use wgpu::{
     Origin3d, Queue, RenderPass, RenderPipeline, TexelCopyBufferLayout, TexelCopyTextureInfo,
     TextureAspect, COPY_BUFFER_ALIGNMENT,
 };
+use crate::SHADOW_MARGIN_PX;
+
+const M: u16 = SHADOW_MARGIN_PX;
+
+fn pad_image_data(src: &[u8], w: u16, h: u16, ty: ContentType) -> Vec<u8> {
+    if w == 0 || h == 0 {
+        return Vec::new();
+    }
+    let c = ty.bytes_per_pixel();
+    let pad = M as usize;
+    let orig_w = w as usize;
+    let orig_h = h as usize;
+    let padded_w = orig_w + 2 * pad;
+    let padded_h = orig_h + 2 * pad;
+
+    let mut dst = vec![0; padded_w * padded_h * c];
+
+    let row_src = orig_w * c;
+    let row_dst = padded_w * c;
+
+    for y in 0..orig_h {
+        let off_s = y * row_src;
+        let off_d = (y + pad) * row_dst + pad * c;
+        dst[off_d..off_d + row_src]
+            .copy_from_slice(&src[off_s..off_s + row_src]);
+    }
+
+    dst
+}
 
 /// A text renderer that uses cached glyphs to render text into an existing render pass.
 pub struct TextRenderer {
@@ -190,15 +217,18 @@ impl TextRenderer {
                     bounds_min_y,
                     bounds_max_x,
                     bounds_max_y,
+                    text_area.shadow,
                     |_cache, _font_system, rasterize_custom_glyph| -> Option<GetGlyphImageResult> {
                         if width == 0 || height == 0 {
                             return None;
                         }
 
+                        let pw = width + 2 * M;
+                        let ph = height + 2 * M;
                         let input = RasterizeCustomGlyphRequest {
                             id: glyph.id,
-                            width,
-                            height,
+                            width: pw,
+                            height: ph,
                             x_bin,
                             y_bin,
                             scale: text_area.scale,
@@ -208,13 +238,15 @@ impl TextRenderer {
 
                         output.validate(&input, None);
 
+                        let data = pad_image_data(&output.data, width, height, output.content_type);
+
                         Some(GetGlyphImageResult {
                             content_type: output.content_type,
                             top: 0,
                             left: 0,
-                            width,
-                            height,
-                            data: output.data,
+                            width: pw,
+                            height: ph,
+                            data,
                         })
                     },
                     &mut metadata_to_depth,
@@ -264,6 +296,7 @@ impl TextRenderer {
                         bounds_min_y,
                         bounds_max_x,
                         bounds_max_y,
+                        text_area.shadow,
                         |cache,
                          font_system,
                          _rasterize_custom_glyph|
@@ -280,13 +313,31 @@ impl TextRenderer {
                                 }
                             };
 
+                            let ow = image.placement.width as u16;
+                            let oh = image.placement.height as u16;
+
+                            if ow == 0 || oh == 0 {
+                                return Some(GetGlyphImageResult {
+                                    content_type,
+                                    top: image.placement.top as i16,
+                                    left: image.placement.left as i16,
+                                    width: 0,
+                                    height: 0,
+                                    data: Vec::new(),
+                                });
+                            }
+
+                            let pw = ow + 2 * M;
+                            let ph = oh + 2 * M;
+                            let data = pad_image_data(&image.data, ow, oh, content_type);
+
                             Some(GetGlyphImageResult {
                                 content_type,
                                 top: image.placement.top as i16,
                                 left: image.placement.left as i16,
-                                width: image.placement.width as u16,
-                                height: image.placement.height as u16,
-                                data: image.data,
+                                width: pw,
+                                height: ph,
+                                data,
                             })
                         },
                         &mut metadata_to_depth,
@@ -417,6 +468,7 @@ fn prepare_glyph<R>(
     bounds_min_y: i32,
     bounds_max_x: i32,
     bounds_max_y: i32,
+    shadow: Option<TextShadow>,
     get_glyph_image: impl FnOnce(
         &mut SwashCache,
         &mut FontSystem,
@@ -517,16 +569,19 @@ where
         })
     };
 
-    let mut x = x + details.left as i32;
-    let mut y = (line_y * scale_factor).round() as i32 + y - details.top as i32;
+    let full_w = details.width + M;
+    let full_h = details.height + M;
+
+    let mut x = x + details.left as i32 - M as i32;
+    let mut y = (line_y * scale_factor).round() as i32 + y - details.top as i32 - M as i32;
 
     let (mut atlas_x, mut atlas_y, content_type) = match details.gpu_cache {
         GpuCacheStatus::InAtlas { x, y, content_type } => (x, y, content_type),
         GpuCacheStatus::SkipRasterization => return Ok(None),
     };
 
-    let mut width = details.width as i32;
-    let mut height = details.height as i32;
+    let mut width = full_w as i32;
+    let mut height = full_h as i32;
 
     // Starts beyond right edge or ends beyond left edge
     let max_x = x + width;
@@ -583,5 +638,7 @@ where
             } as u16,
         ],
         depth,
+        shadow_intensity: shadow.map_or(0.0, |s| s.shadow_intensity),
+        shadow_radius: shadow.map_or(0.0, |s| s.shadow_radius),
     }))
 }

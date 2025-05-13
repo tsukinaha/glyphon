@@ -91,6 +91,16 @@ impl Cache {
                     offset: mem::size_of::<u32>() as u64 * 6,
                     shader_location: 5,
                 },
+                wgpu::VertexAttribute {
+                    format: VertexFormat::Float32,
+                    offset: mem::size_of::<u32>() as u64 * 7,
+                    shader_location: 6,
+                },
+                wgpu::VertexAttribute {
+                    format: VertexFormat::Float32,
+                    offset: mem::size_of::<u32>() as u64 * 8,
+                    shader_location: 7,
+                },
             ],
         };
 
@@ -129,7 +139,7 @@ impl Cache {
         let uniforms_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             entries: &[BindGroupLayoutEntry {
                 binding: 0,
-                visibility: ShaderStages::VERTEX,
+                visibility: ShaderStages::VERTEX_FRAGMENT,
                 ty: BindingType::Buffer {
                     ty: BufferBindingType::Uniform,
                     has_dynamic_offset: false,
