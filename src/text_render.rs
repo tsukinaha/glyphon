@@ -1,5 +1,9 @@
+use crate::SHADOW_MARGIN_PX;
 use crate::{
-    custom_glyph::CustomGlyphCacheKey, ColorMode, ContentType, FontSystem, GlyphDetails, GlyphToRender, GpuCacheStatus, PrepareError, RasterizeCustomGlyphRequest, RasterizedCustomGlyph, RenderError, SwashCache, SwashContent, TextArea, TextAtlas, TextShadow, Viewport
+    custom_glyph::CustomGlyphCacheKey, ColorMode, ContentType, FontSystem, GlyphDetails,
+    GlyphToRender, GpuCacheStatus, PrepareError, RasterizeCustomGlyphRequest,
+    RasterizedCustomGlyph, RenderError, SwashCache, SwashContent, TextArea, TextAtlas, TextShadow,
+    Viewport,
 };
 use cosmic_text::{Color, SubpixelBin};
 use std::slice;
@@ -8,7 +12,6 @@ use wgpu::{
     Origin3d, Queue, RenderPass, RenderPipeline, TexelCopyBufferLayout, TexelCopyTextureInfo,
     TextureAspect, COPY_BUFFER_ALIGNMENT,
 };
-use crate::SHADOW_MARGIN_PX;
 
 const M: u16 = SHADOW_MARGIN_PX;
 
@@ -31,8 +34,7 @@ fn pad_image_data(src: &[u8], w: u16, h: u16, ty: ContentType) -> Vec<u8> {
     for y in 0..orig_h {
         let off_s = y * row_src;
         let off_d = (y + pad) * row_dst + pad * c;
-        dst[off_d..off_d + row_src]
-            .copy_from_slice(&src[off_s..off_s + row_src]);
+        dst[off_d..off_d + row_src].copy_from_slice(&src[off_s..off_s + row_src]);
     }
 
     dst
@@ -259,8 +261,9 @@ impl TextRenderer {
             let is_run_visible = |run: &cosmic_text::LayoutRun| {
                 let start_y_physical = (text_area.top + (run.line_top * text_area.scale)) as i32;
                 let end_y_physical = start_y_physical + (run.line_height * text_area.scale) as i32;
-                
-                start_y_physical <= text_area.bounds.bottom && text_area.bounds.top <= end_y_physical
+
+                start_y_physical <= text_area.bounds.bottom
+                    && text_area.bounds.top <= end_y_physical
             };
 
             let layout_runs = text_area
