@@ -1,6 +1,6 @@
 struct VertexInput {
     @builtin(vertex_index) vertex_idx: u32,
-    @location(0) pos: vec2<i32>,
+    @location(0) pos: vec2<f32>,
     @location(1) dim: u32,
     @location(2) uv: u32,
     @location(3) color: u32,
@@ -60,12 +60,12 @@ fn vs_main(in_vert: VertexInput) -> VertexOutput {
     let corner_offset = vec2<u32>(width, height) * corner_position;
 
     uv = uv + corner_offset;
-    pos = pos + vec2<i32>(corner_offset);
+    pos = pos + vec2<f32>(corner_offset);
 
     var vert_output: VertexOutput;
 
     vert_output.position = vec4<f32>(
-        2.0 * vec2<f32>(pos) / vec2<f32>(params.screen_resolution) - 1.0,
+        2.0 * pos / vec2<f32>(params.screen_resolution) - 1.0,
         in_vert.depth,
         1.0,
     );

@@ -55,7 +55,7 @@ pub(crate) struct GlyphDetails {
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct GlyphToRender {
-    pos: [i32; 2],
+    pos: [f32; 2],
     dim: [u16; 2],
     uv: [u16; 2],
     color: u32,

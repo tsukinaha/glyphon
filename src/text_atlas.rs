@@ -129,13 +129,35 @@ impl InnerAtlas {
                 GpuCacheStatus::SkipRasterization => continue,
             };
 
-            let (image_data, width, height) = match cache_key {
+            match cache_key {
                 GlyphonCacheKey::Text(cache_key) => {
                     let image = cache.get_image_uncached(font_system, cache_key).unwrap();
-                    let width = image.placement.width as usize;
-                    let height = image.placement.height as usize;
+                    let width = image.placement.width;
+                    let height = image.placement.height;
 
-                    (image.data, width, height)
+                    queue.write_texture(
+                        TexelCopyTextureInfo {
+                            texture: &self.texture,
+                            mip_level: 0,
+                            origin: Origin3d {
+                                x: x as u32 + M as u32,
+                                y: y as u32 + M as u32,
+                                z: 0,
+                            },
+                            aspect: TextureAspect::All,
+                        },
+                        &image.data,
+                        TexelCopyBufferLayout {
+                            offset: 0,
+                            bytes_per_row: Some(width * self.kind.num_channels() as u32),
+                            rows_per_image: None,
+                        },
+                        Extent3d {
+                            width,
+                            height,
+                            depth_or_array_layers: 1,
+                        },
+                    );
                 }
                 GlyphonCacheKey::Custom(cache_key) => {
                     let input = RasterizeCustomGlyphRequest {
@@ -154,37 +176,33 @@ impl InnerAtlas {
                     // Sanity checks on the rasterizer output
                     rasterized_glyph.validate(&input, Some(self.kind.as_content_type()));
 
-                    (
-                        rasterized_glyph.data,
-                        cache_key.width as usize,
-                        cache_key.height as usize,
-                    )
+                    queue.write_texture(
+                        TexelCopyTextureInfo {
+                            texture: &self.texture,
+                            mip_level: 0,
+                            origin: Origin3d {
+                                x: x as u32,
+                                y: y as u32,
+                                z: 0,
+                            },
+                            aspect: TextureAspect::All,
+                        },
+                        &rasterized_glyph.data,
+                        TexelCopyBufferLayout {
+                            offset: 0,
+                            bytes_per_row: Some(
+                                cache_key.width as u32 * self.kind.num_channels() as u32,
+                            ),
+                            rows_per_image: None,
+                        },
+                        Extent3d {
+                            width: cache_key.width as u32,
+                            height: cache_key.height as u32,
+                            depth_or_array_layers: 1,
+                        },
+                    );
                 }
             };
-
-            queue.write_texture(
-                TexelCopyTextureInfo {
-                    texture: &self.texture,
-                    mip_level: 0,
-                    origin: Origin3d {
-                        x: x as u32,
-                        y: y as u32,
-                        z: 0,
-                    },
-                    aspect: TextureAspect::All,
-                },
-                &image_data,
-                TexelCopyBufferLayout {
-                    offset: 0,
-                    bytes_per_row: Some(width as u32 * self.kind.num_channels() as u32),
-                    rows_per_image: None,
-                },
-                Extent3d {
-                    width: width as u32,
-                    height: height as u32,
-                    depth_or_array_layers: 1,
-                },
-            );
         }
 
         self.texture_view = self.texture.create_view(&TextureViewDescriptor::default());

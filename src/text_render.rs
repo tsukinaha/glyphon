@@ -259,7 +259,7 @@ impl TextRenderer {
             let is_run_visible = |run: &cosmic_text::LayoutRun| {
                 let start_y_physical = (text_area.top + (run.line_top * text_area.scale)) as i32;
                 let end_y_physical = start_y_physical + (run.line_height * text_area.scale) as i32;
-                
+
                 start_y_physical <= text_area.bounds.bottom && text_area.bounds.top <= end_y_physical
             };
 
@@ -433,7 +433,7 @@ fn create_oversized_buffer(
         usage,
         mapped_at_creation: true,
     });
-    buffer.slice(..).get_mapped_range_mut()[..contents.len()].copy_from_slice(contents);
+    buffer.slice(..).get_mapped_range_mut().slice(..contents.len()).copy_from_slice(contents);
     buffer.unmap();
     (buffer, size)
 }
@@ -569,8 +569,8 @@ where
         })
     };
 
-    let full_w = details.width + M;
-    let full_h = details.height + M;
+    let full_w = details.width;
+    let full_h = details.height;
 
     let mut x = x + details.left as i32 - M as i32;
     let mut y = (line_y * scale_factor).round() as i32 + y - details.top as i32 - M as i32;
@@ -626,7 +626,7 @@ where
     let depth = metadata_to_depth(metadata);
 
     Ok(Some(GlyphToRender {
-        pos: [x, y],
+        pos: [x as f32, y as f32],
         dim: [width as u16, height as u16],
         uv: [atlas_x, atlas_y],
         color: color.0,
